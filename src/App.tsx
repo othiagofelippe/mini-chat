@@ -1,35 +1,97 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChatHeader } from "./components/ChatHeader";
+import { MessageBubble } from "./components/MessageBubble";
+import { MessageInput } from "./components/MessageInput";
+import * as S from "./styles";
+import type { Message } from "./types/message";
+import {
+  fetchMessages,
+  getNextIncomingMessage,
+  sendMessage,
+} from "./services/chatApi";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    const loadInitialMessages = async () => {
+      try {
+        const initialMessages = await fetchMessages();
+        setMessages(initialMessages);
+      } catch (error) {
+        console.error("Erro ao carregar mensagens:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialMessages();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newMessage = getNextIncomingMessage();
+      if (newMessage) {
+        setMessages((prev) => [...prev, newMessage]);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSendMessage = useCallback(async (text: string) => {
+    try {
+      const newMessage = await sendMessage(text);
+      setMessages((prev) => [...prev, newMessage]);
+    } catch (error) {
+      console.error("Erro ao enviar mensagem:", error);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <S.Container>
+        <ChatHeader />
+        <S.LoadingContainer>
+          <S.LoadingText>Carregando mensagens...</S.LoadingText>
+        </S.LoadingContainer>
+        <MessageInput disabled onSendMessage={handleSendMessage} />
+      </S.Container>
+    );
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <S.Container>
+      <ChatHeader />
+
+      <S.MessagesContainer>
+        {messages.map((msg) => (
+          <MessageBubble
+            key={`${msg.id}-${msg.timestamp}`}
+            id={msg.id}
+            author={msg.author}
+            text={msg.text}
+            timestamp={msg.timestamp}
+            isOwn={msg.isOwn}
+            avatarUrl={msg.avatarUrl}
+          />
+        ))}
+        <div ref={messagesEndRef} />
+      </S.MessagesContainer>
+
+      <MessageInput onSendMessage={handleSendMessage} />
+    </S.Container>
+  );
 }
 
-export default App
+export default App;
