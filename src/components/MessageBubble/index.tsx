@@ -1,13 +1,7 @@
+import type { Message } from "../../types/message";
 import * as S from "./styles";
 
-interface MessageBubbleProps {
-  id: number;
-  author: string;
-  text: string;
-  timestamp?: string;
-  isOwn: boolean;
-  avatarUrl: string;
-}
+type MessageBubbleProps = Message
 
 export function MessageBubble({
   id,
